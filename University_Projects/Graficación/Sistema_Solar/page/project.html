@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Sistema solar</title>
+		<link rel="icon", href="https://images.vexels.com/media/users/3/175478/isolated/preview/d024a7d1f89320f2e290265408a38be4-pluma-tintero-tintero-papel-plano.png">
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<link type="text/css" rel="stylesheet" href="Gil_Uribe_Fernando.css">
+	</head>
+	<body>
+		<!-- Import maps polyfill -->
+		<!-- Remove this when import maps will be widely supported -->
+		<script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "../build/three.module.js",
+					"three/addons/": "./jsm/"
+				}
+			}
+		</script>
+		<script type="module" src="..\my_content\js\quote_system.js"></script>
+		<div id="info">
+			<!-- <a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> - procedural 3D text<br/>
+			type to enter new text, drag to spin the text -->
+			Fernando José Gil Uribe | 202037995
+			<br/>
+			Sistema solar cool
+			<!-- <button id="quoteButton">¡Clic aquí!</button> -->
+		</div>
+
+		<script type="module">
+
+			// Importar partes necesarias para el código
+			import * as THREE from 'three';
+			import { ParametricGeometry } from 'three/addons/geometries/ParametricGeometry.js';
+			import { ParametricGeometries } from 'three/addons/geometries/ParametricGeometries.js';
+			import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+			import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+			import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+			import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+
+			// Variables necesarias por Three.js
+			THREE.Cache.enabled = true;
+			let container;
+			let camera, cameraTarget, scene, renderer;
+			let windowHalfX = window.innerWidth / 2;
+
+			// Variables de objetos de objetos.
+			let mercurio, venus, tierra, luna, marte, jupiter, saturno;
+			
+			// Variables para guardar posiciones de objetos
+			let tierra_poss = [],
+				luna_poss = [],
+				mercurio_poss = [],
+				venus_poss = [],
+				marte_poss = [],
+				jupiter_poss = [],
+				saturno_poss = [];
+			
+			// Variables de iteradores para animaciones
+			let iter_luna = 0,
+				iter_tierra = 0,
+				iter_mercurio = 0,
+				iter_venus = 0,
+				iter_marte = 0,
+				iter_jupiter = 0,
+				iter_saturno = 0;
+			
+			// Función para generar una lista de coordenadas para x,y,z de una circunferencia
+			function circleCoords(originX, originY, originZ, radius, stepSize = 0.1, yLowerLimit = 0, yUpperLimit = 1) {
+				let positions = [];
+				let t = 0;
+				let y_temp = 0;
+				let y_dir = 1;
+				while (t < 2 * Math.PI) {
+
+					if(y_temp > yUpperLimit || y_temp < yLowerLimit) y_dir = -y_dir;
+					y_temp = ((yLowerLimit == yUpperLimit) ? 0 : y_temp + y_dir);
+					positions.push([
+						radius * Math.cos(t) + originX, 
+						y_temp, 
+						radius * Math.sin(t) + originZ]);
+					t += stepSize;
+				}
+				// let a = positions.slice(0, Math.floor(positions.length / 2));
+				// let b = a.slice();
+				// b = b.reverse();
+				// for(let i = 0; i < b.length ; i++){
+				// 	b[i][0] = -b[i][0];
+				// 	b[i][2] = -b[i][2];
+				// }
+				// positions = a.concat(b);
+				// console.log(a);
+				// console.log(b);
+				// console.log(positions);
+				return positions;
+			}
+
+			// Función para generar una lista de coordenadas en x,z para una trayectoria en espiral sobre una trayectoria elíptica
+			function getEllipseCoords(xRadius, zRadius, yOrigin, angleStep = 0.1) {
+				let coords = [];
+				let angle = 0;
+				while (angle < 2 * Math.PI) {
+					const x = xRadius * Math.cos(angle);
+					const z = zRadius * Math.sin(angle);
+					coords.push([x, yOrigin, z]);
+					xRadius += -xRadius * (angleStep/(2 * Math.PI));
+					zRadius += (2 * Math.PI)*angleStep;
+					angle += angleStep;
+				}
+				let anticoords = coords.slice();
+				anticoords.reverse();
+				let conc_coords = coords.concat(anticoords);
+				return conc_coords;
+			}
+			
+			init();
+			animate();
+
+			function init() {
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				// Escena y render
+
+				scene = new THREE.Scene();
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				container.appendChild( renderer.domElement );				
+				
+				// Cámara
+
+				camera = new THREE.PerspectiveCamera( 30, window.innerWidth / window.innerHeight, 1, 9000);
+				camera.position.set(0, 0, 8888);
+				cameraTarget = new THREE.Vector3( 0, 0, 0 );
+
+				// Controles de cámara
+				let controls = new OrbitControls( camera, renderer.domElement );
+				controls.screenSpacePanning = true;
+				controls.minDistance = camera.near;
+				controls.maxDistance = camera.far;
+				controls.target.set( 0, 0, 0 );
+				controls.update();
+				
+				// Función para dejar la cámara en su posición inicial
+				function defaultCamera(){
+					camera.position.set(0, 0, 8888);
+					cameraTarget = new THREE.Vector3( 0, 0, 0 );
+					camera.parent = null;
+					controls.minDistance = camera.near;
+					controls.maxDistance = camera.far;
+					controls.target.set( 0, 0, 0 );
+					controls.update();
+				}
+
+				defaultCamera();
+
+				// Función de utilería para actualizar la posición y objetivo de la cámara
+				function updateCamera(object){
+					if (!object){
+						defaultCamera();
+						return;
+					}
+					cameraTarget = object.position;
+					camera.parent = object;
+					camera.position.set(cameraTarget.x, 
+										cameraTarget.y, 
+										(object.geometry.parameters.radius ?
+										object.geometry.parameters.radius*8 : object.geometry.parameters.outer_radius));
+					// console.log(camera.position);
+				}
+
+				// Funciones para el GUI que muestran a cada planeta.
+				const params = {
+					Mercurio: function () {
+						updateCamera(mercurio);
+						console.log("Viendo a mercurio");
+					},
+					Venus: function () {
+						updateCamera(venus);
+						console.log("Viendo a Venus");
+					},
+					Tierra: function () {
+						updateCamera(tierra);
+						console.log("Viendo a Tierra");
+					},
+					Marte: function () {
+						updateCamera(marte);
+						console.log("Viendo a Marte");
+					},
+					Jupiter: function () {
+						updateCamera(jupiter);
+						console.log("Viendo a Jupiter");
+					},
+					Saturno: function () {
+						updateCamera(saturno);
+						console.log("Viendo a Saturno");
+					},
+					Default: function () {
+						updateCamera(null);
+						console.log("Perspectiva reiniciada");
+					},
+					PDF: function (){
+						window.open("../Gil_Uribe_Fernando.pdf", "_blank");
+					}
+				};
+
+				// GUI y asignaciones de botones.
+				const gui = new GUI();
+				gui.add( params, 'Mercurio' ).name( 'Ver Mercurio' );
+				gui.add( params, 'Venus' ).name( 'Ver Venus' );
+				gui.add( params, 'Tierra' ).name( 'Ver Tierra (+ Luna)' );
+				gui.add( params, 'Marte' ).name( 'Ver Marte' );
+				gui.add( params, 'Jupiter' ).name( 'Ver Jupiter' );
+				gui.add( params, 'Saturno' ).name( 'Ver Saturno' );
+				gui.add( params, 'Default' ).name( 'Reiniciar Cámara' );
+				gui.add( params, 'PDF' ).name( 'Ver reporte' );
+				gui.open();
+
+
+				window.addEventListener( 'resize', onWindowResize );
+				// Distancia media desde el Sol
+				// Millones de Km
+				// Mercurio 57,9
+				// Venus 108,2
+				// Tierra 149,5
+				// -> Luna 0.384400
+				// Marte 227,9
+				// Júpiter 778,3
+				// Saturno 1428,0
+				
+				// Tamaño Planetas (Diámetro)
+				// MERCURIO 2,440 km
+				// VENUS 6,052 km
+				// TIERRA 6,378 km
+				// -> LUNA 1,737.4 km
+				// MARTE 3,397 km
+				// JÚPITER 71,492 km
+				// SATURNO 54,364 km
+				// URANO 25,559 km
+				// NEPTUNO 24,766 km
+				// PLUTÓN 1,160 km
+
+				// 696,340 km
+				const sol_rad = 696;
+				const sol_texture = new THREE.TextureLoader().load( 
+					'../my_content/imgs/2k_sun.jpg' );
+				const sol_geometry = new ParametricGeometry( ParametricGeometries.mobius, 20, 20 );
+				// const sol_geometry = new THREE.SphereGeometry( 696, 32, 16 );
+				const sol_material = new THREE.MeshLambertMaterial( { color: 0xffffff, map : sol_texture, side: THREE.DoubleSide  } );
+				const sol = new THREE.Mesh( sol_geometry, sol_material);
+				sol.scale.multiplyScalar(295);
+				scene.add(sol);
+
+				// Mercurio
+				const mercurio_texture = new THREE.TextureLoader().load( 
+					'../my_content/imgs/2k_mercury.jpg' );
+				const mercurio_geometry = new THREE.SphereGeometry( 2.44, 32, 16 );
+				const mercurio_material = new THREE.MeshLambertMaterial( { 
+					color: 0xffffff, map: mercurio_texture } );
+				mercurio = new THREE.Mesh( mercurio_geometry, mercurio_material );
+				mercurio.position.x = sol_rad + 58;
+				scene.add(mercurio);
+				
+				// Venus
+				const venus_texture = new THREE.TextureLoader().load( 
+					'../my_content/imgs/2k_venus_atmosphere.jpg' );
+				const venus_geometry = new THREE.TorusGeometry( 6.052, 2, 30, 6);
+				const venus_material = new THREE.MeshLambertMaterial( { 
+					color: 0xffffff, map: venus_texture } );
+				venus = new THREE.Mesh( venus_geometry, venus_material );
+				venus.position.x = sol_rad + 108;
+				scene.add(venus);
+
+				// Tierra
+				const tierra_rad = 6.378;
+				const tierra_texture = new THREE.TextureLoader().load( 
+					'../my_content/imgs/2k_earth_daymap.jpg' );
+				const tierra_geometry = new THREE.RingGeometry( 0.5, tierra_rad, 20, 5, 0, Math.PI*2 );
+				const tierra_material = new THREE.MeshLambertMaterial( { 
+					color: 0xffffff, map: tierra_texture, side: THREE.DoubleSide }  );
+				tierra = new THREE.Mesh( tierra_geometry, tierra_material );
+				tierra.position.x = sol_rad + 150;
+				scene.add(tierra)
+				// Luna
+				const luna_texture = new THREE.TextureLoader().load( 
+					'../my_content/imgs/2k_moon.jpg' );
+				const luna_geometry = new THREE.CylinderGeometry( 1.7374, 1.7374, 1.7374, 32, 32, true);
+				const luna_material = new THREE.MeshLambertMaterial( { 
+					color: 0xffffff, map: luna_texture, side: THREE.DoubleSide }  );
+				luna = new THREE.Mesh( luna_geometry, luna_material );
+				luna.parent = tierra;
+				luna.position.x = luna.parent.position.x + tierra_rad + 3.84400;
+				tierra.add(luna)
+
+				// Marte
+				let points = [];
+				for ( let i = 0; i < 50; i ++ ) {
+					points.push( new THREE.Vector2( Math.sin( i * 0.2 ) * Math.sin( i * 0.1 ) * 15 + 50, ( i - 5 ) * 2 ) );
+				}
+				const marte_texture = new THREE.TextureLoader().load( 
+					'../my_content/imgs/2k_mars.jpg' );
+				const marte_geometry = new THREE.LatheGeometry( points, 20); // 3.397
+				const marte_material = new THREE.MeshLambertMaterial( { 
+					color: 0xffffff, map: marte_texture, side: THREE.DoubleSide  }  );
+				marte = new THREE.Mesh( marte_geometry, marte_material );
+				marte.position.x = sol_rad + 228;
+				marte.scale.multiplyScalar(.1);
+				scene.add(marte);
+
+				// Jupiter
+				const jupiter_texture = new THREE.TextureLoader().load( 
+					'../my_content/imgs/2k_jupiter.jpg' );
+				const jupiter_geometry = new THREE.BoxGeometry( 71.492, 71.492, 71.492 );
+				const jupiter_material = new THREE.MeshLambertMaterial( { 
+					color: 0xffffff, map: jupiter_texture } );
+				jupiter = new THREE.Mesh( jupiter_geometry, jupiter_material );
+				jupiter.position.x = sol_rad + 778;
+				scene.add(jupiter);
+
+				// Saturno
+				const saturno_texture = new THREE.TextureLoader().load( 
+					'../my_content/imgs/2k_saturn.jpg' );
+				const saturno_geometry =  new ParametricGeometry( ParametricGeometries.klein, 20, 20 );
+				const saturno_material = new THREE.MeshLambertMaterial( { 
+					color: 0xffffff, map: saturno_texture }  );
+				saturno = new THREE.Mesh( saturno_geometry, saturno_material );
+				saturno.position.x = sol_rad + 1428;
+				// let saturno2 = new THREE.Mesh( new THREE.SphereGeometry( 54.364, 32, 16 ), saturno_material );
+				// saturno2.position.x = sol_rad + 1428+100;
+				saturno.scale.multiplyScalar(12);
+				scene.add(saturno);
+				
+				// Luces
+				let lights = [];
+				const n_lights = 7;
+				const sphereSize = 1/n_lights;
+				const pl1 = new THREE.PointLight( 0xffffff, sphereSize, 10000 );
+				pl1.position.set( 0, 0, 0 );
+				lights.push(pl1);
+				scene.add( pl1 );
+				let divs = 80;
+				// Creación de luces en eje Z
+				for (let i = 0; i<n_lights ; i++){
+					const ptemp = pl1.clone();
+					ptemp.position.set( 0, 0, (i%2==0? divs*i : -divs*(i+1)) );
+					lights.push(ptemp);
+					scene.add( ptemp );
+				}
+				// Creación de luces en eje Y
+				for (let i = 0; i<n_lights ; i++){
+					const ptemp = pl1.clone();
+					ptemp.position.set( 0, (i%2==0? divs*i : -divs*(i+1)), 0);
+					lights.push(ptemp);
+					scene.add( ptemp );
+				}
+				// Helpers de luces
+				// for(let i = 0; i < lights.length ; i++){
+				// 	const pointLightHelper = new THREE.PointLightHelper( lights[i], sphereSize*100 );
+				// 	scene.add( pointLightHelper );
+				// }
+
+				// Procesamiento de posiciones de animación
+				tierra_poss = getEllipseCoords(tierra.position.x, tierra.position.x*.75, 0, 0.01);
+				luna_poss = circleCoords(0, 0, 0, tierra_rad*1.5, 0.05, 1, 1);
+				mercurio_poss = circleCoords(0, 0, 0, mercurio.position.x*1.5, 0.005, 1, 1);
+				venus_poss = circleCoords(0, 0, 0, venus.position.x*1.5, 0.005, 1, 1);
+				marte_poss = circleCoords(0, 0, 0, marte.position.x*1.5, 0.005, 1, 1);
+				jupiter_poss = circleCoords(0, 0, 0, jupiter.position.x*1.5, 0.005, 1, 1);
+				saturno_poss = circleCoords(0, 0, 0, saturno.position.x*1.5, 0.005, 1, 1);
+			}
+
+			function onWindowResize() {
+				windowHalfX = window.innerWidth / 2;
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+			}
+
+			//
+
+			function animate() {
+				requestAnimationFrame( animate );
+
+				render();
+			}			
+
+			function render() {
+				// Procesamiento de la animaciones
+				try {
+					// Verificar que hay posiciones de animación
+					if(tierra_poss){
+						// Reiniciar iteración si se llega al límite
+						if (iter_tierra >= tierra_poss.length) iter_tierra = 0;
+						// Siguiente posición
+						else iter_tierra = iter_tierra+1;
+						// Mover objeto
+						tierra.position.set(tierra_poss[iter_tierra][0],tierra_poss[iter_tierra][1],tierra_poss[iter_tierra][2]);
+					}
+					// Verificar que hay posiciones de animación
+					if(luna_poss){
+						// Reiniciar iteración si se llega al límite
+						if (iter_luna >= luna_poss.length) iter_luna = 0;
+						// Siguiente posición
+						else iter_luna += 1;
+						// Asignar parent de luna
+						luna.parent = tierra;
+						// Mover objeto
+						luna.position.set(luna_poss[iter_luna][0],
+						luna_poss[iter_luna][1],
+						luna_poss[iter_luna][2]);
+					}
+					// Las siguientes operaciones son similares a la animación de la tierra
+					if(mercurio_poss){
+						if (iter_mercurio >= mercurio_poss.length) {
+							iter_mercurio = 0;
+						}
+						else iter_mercurio += 1;
+						mercurio.position.set(mercurio_poss[iter_mercurio][0],mercurio_poss[iter_mercurio][1],mercurio_poss[iter_mercurio][2]);
+					}
+					if(venus_poss){
+						if (iter_venus >= venus_poss.length) iter_venus = 0;
+						else iter_venus += 1;
+						venus.position.set(venus_poss[iter_venus][0],venus_poss[iter_venus][1],venus_poss[iter_venus][2]);
+					}
+					if(marte_poss){
+						if (iter_marte >= marte_poss.length) iter_marte = 0;
+						else iter_marte += 1;
+						marte.position.set(marte_poss[iter_marte][1],marte_poss[iter_marte][2],marte_poss[iter_marte][0]);
+					}
+					if(jupiter_poss){
+						if (iter_jupiter >= jupiter_poss.length) iter_jupiter = 0;
+						else iter_jupiter += 1;
+						jupiter.position.set(jupiter_poss[iter_jupiter][0],jupiter_poss[iter_jupiter][2],jupiter_poss[iter_jupiter][1]);
+					}
+					if(saturno_poss){
+						if (iter_saturno >= saturno_poss.length) iter_saturno = 0;
+						else iter_saturno += 1;
+						saturno.position.set(saturno_poss[iter_saturno][1],saturno_poss[iter_saturno][0],saturno_poss[iter_saturno][2]);
+					}
+				}catch (error) { }
+				camera.lookAt( cameraTarget );
+
+				renderer.clear();
+				renderer.render( scene, camera );
+
+			}
+		</script>
+	</body>
+</html>
