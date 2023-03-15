@@ -27,7 +27,7 @@
 		</div>
 
 		<script type="module">
-
+			console.log("Aquí está el código!")
 			// Importar partes necesarias para el código
 			import * as THREE from 'three';
 			import { ParametricGeometry } from 'three/addons/geometries/ParametricGeometry.js';
@@ -304,7 +304,7 @@
 					color: 0xffffff, map: marte_texture, side: THREE.DoubleSide  }  );
 				marte = new THREE.Mesh( marte_geometry, marte_material );
 				marte.position.x = sol_rad + 228;
-				marte.scale.multiplyScalar(.1);
+				marte.scale.multiplyScalar(1);
 				scene.add(marte);
 
 				// Jupiter
