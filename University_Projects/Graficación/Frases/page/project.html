@@ -1,0 +1,694 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Programa citas</title>
+		<link rel="icon", href="https://images.vexels.com/media/users/3/175478/isolated/preview/d024a7d1f89320f2e290265408a38be4-pluma-tintero-tintero-papel-plano.png">
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<link type="text/css" rel="stylesheet" href="style.css">
+	</head>
+	<body>
+		<!-- Import maps polyfill -->
+		<!-- Remove this when import maps will be widely supported -->
+		<script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "/University_Projects/Graficación/Three.js-utils/build/three.module.js",
+					"three/addons/": "/University_Projects/Graficación/Three.js-utils/prime-jsm/"
+				}
+			}
+		</script>
+		<script type="module" src="..\my_content\js\quote_system.js"></script>
+		<!-- div para información personal -->
+		<div id="info">
+			Fernando José Gil Uribe | 202037995
+			<br/>
+			Frases celebres con texto 3D y sintetizador de voz
+		</div>
+
+		<script type="module">
+
+			import * as THREE from 'three';
+
+			import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+			import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+
+			import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+			
+			// Quote system
+			import { findQuote, textToSpeech } from "../my_content/js/quote_system.js";
+
+			THREE.Cache.enabled = true;
+
+			let container;
+			
+			let coloresInstitucionales = ['00b5e2', '003b5c', 'ed7102'];
+
+			let camera, cameraTarget, scene, renderer;
+
+			let group, textMesh1, textMesh2, textGeo, materials;
+
+			let firstLetter = true;
+
+			let text = 'Programa de citas... citas famosas, no citas amorosas.',
+
+				bevelEnabled = true,
+
+				font = undefined,
+
+				fontName = 'optimer', // helvetiker, optimer, gentilis, droid sans, droid serif
+				fontWeight = 'bold'; // normal bold
+
+			const height = 10,
+				size = 30,
+				hover = 50,
+
+				curveSegments = 4,
+
+				bevelThickness = 2,
+				bevelSize = 1.5;
+
+			const mirror = false;
+
+			const fontMap = {
+
+				'helvetiker': 0,
+				'optimer': 1,
+				'gentilis': 2,
+				'droid/droid_sans': 3,
+				'droid/droid_serif': 4
+
+			};
+
+			const weightMap = {
+
+				'regular': 0,
+				'bold': 1
+
+			};
+
+			const reverseFontMap = [];
+			const reverseWeightMap = [];
+
+			for ( const i in fontMap ) reverseFontMap[ fontMap[ i ] ] = i;
+			for ( const i in weightMap ) reverseWeightMap[ weightMap[ i ] ] = i;
+
+			let targetRotation = 0;
+			let targetRotationOnPointerDown = 0;
+
+			let pointerX = 0;
+			let pointerXOnPointerDown = 0;
+
+			let windowHalfX = window.innerWidth / 2;
+
+			let fontIndex = 1;
+
+
+			// Cosas de la esfera:
+			// Radio de la esfera
+			const sph_rad = 20;
+			// Dirección de la esfera
+			let sph_dir = 1;
+			// Creación de la geometría de la esfera con radio 20, 10 divisiones en el eje X y 10 divisiones en el eje Y
+			const geometry = new THREE.SphereGeometry(sph_rad, 10, 10);
+			// Creación del material de la esfera con color 0xed7102 y en modo de malla alambre
+			const material = new THREE.MeshBasicMaterial({ color: 0xed7102, wireframe: true });
+			// Creación de la esfera utilizando la geometría y material anteriormente definidos
+			const sphere = new THREE.Mesh(geometry, material);
+			// Posicionamiento inicial de la esfera en el eje Y
+			sphere.position.y = 0;
+
+			let circPos;
+			let circVals;
+			let currentQuote = null;
+
+			
+			init();
+			animate();
+
+			// Da un número random entre min y max
+			function getRandomInt(min, max) {
+				return Math.floor(Math.random() * (max - min + 1) + min);
+			}
+
+			// Pasa de hex a RGB
+			function hexToRgb(hex) {
+				var r = parseInt(hex.substring(0, 2), 16);
+				var g = parseInt(hex.substring(2, 4), 16);
+				var b = parseInt(hex.substring(4, 6), 16);
+				return [r, g, b];
+			}
+
+			function rgbToHsl(r, g, b) {
+				// Dividimos cada valor de RGB por 255 para convertir a valores de 0 a 1
+				r /= 255, g /= 255, b /= 255;
+				// Encontramos el valor máximo y mínimo entre los tres colores RGB
+				var max = Math.max(r, g, b), min = Math.min(r, g, b);
+				var h, s, l;
+				// El valor de l es el promedio entre el máximo y el mínimo
+				l = (max + min) / 2;
+
+				// Si el valor máximo es igual al mínimo, entonces h y s son 0
+				if (max == min) {
+					h = s = 0;
+				} else {
+					// En caso contrario, calculamos d como la diferencia entre el máximo y el mínimo
+					var d = max - min;
+					// Calculamos s usando la fórmula dependiendo si l es mayor o menor a 0.5
+					s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+					// En base al valor máximo, calculamos h usando un switch case
+					switch (max) {
+						case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+						case g: h = (b - r) / d + 2; break;
+						case b: h = (r - g) / d + 4; break;
+					}
+					// Dividimos h por 6 para convertir a valores de 0 a 1
+					h /= 6;
+				}
+				// Devolvemos un arreglo con los valores de h, s y l
+				return [h, s, l];
+			}
+
+			// Función para conseguir un color institucional tipo HSL.
+			function getValidColor(){
+				let x = getRandomInt(0, coloresInstitucionales.length-1);
+				let hex = coloresInstitucionales[x];
+				let rgb = hexToRgb(hex);
+				let hsl = rgbToHsl(rgb[0], rgb[1], rgb[2]);
+				return hsl;
+			}
+
+			// Normaliza texto para eliminar caracteres especiales (por ejemplo: ñ,á,é,í,ó,ú)
+			function toNormalForm(str) {
+				return str.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+			}
+
+			function fixTextLength(phrase, limit) {
+				// limit es el número máximo de palabras permitidas por línea
+				// por defecto se establece en 6
+				limit = limit ? limit : 6;
+				
+				// Remueve espacios en blanco repetidos en la frase
+				phrase = phrase.replace(/  +/g, " ");
+				phrase = phrase.replace(/   +/g, " ");
+				
+				// Divide la frase en palabras
+				let words = phrase.split(" ");
+				let lines = []; // Almacena las líneas generadas
+				let line = ""; // Almacena la línea actual
+				let lineWordCount = 0; // Contador de palabras en la línea actual
+
+				// Divide las palabras en líneas de acuerdo a la cantidad de palabras permitidas por línea
+				for (let i = 0; i < words.length; i++) {
+					if (lineWordCount + 1 <= limit) {
+						line += words[i] + " ";
+						lineWordCount += 1;
+					} else {
+						lines.push(line.trim()); // Agrega la línea actual a las líneas generadas
+						line = words[i] + " "; // Comienza una nueva línea
+						lineWordCount = 1; // Reinicia el contador de palabras en la línea
+					}
+				}
+				lines.push(line.trim()); // Agrega la última línea generada
+
+				// Invierte el orden de las líneas
+				let straightLines = [];
+				let i = 0;
+				while(lines.length > 0){
+					straightLines[i] = lines.pop();
+					i+=1;
+				}
+
+				// Concatena las líneas en una sola cadena con saltos de línea
+				var auxT = "";
+				while(straightLines.length > 0){
+					auxT += straightLines.pop() + "\n";
+				}
+				return auxT;
+			}
+			text = fixTextLength(text, 3);
+
+			// Lo mismo que fixTextLength pero para una quote
+			function fixQuoteText(data, limit) {
+				limit = limit ? limit : 6;
+				let phrase = toNormalForm(data.quote);
+				phrase = phrase.replace(/  +/g, " ");
+				phrase = phrase.replace(/   +/g, " ");
+				let words = phrase.split(" ");
+				let lines = [];
+				let line = "";
+				let lineWordCount = 0;
+
+				for (let i = 0; i < words.length; i++) {
+					if (lineWordCount + 1 <= limit) {
+						line += words[i] + " ";
+						lineWordCount += 1;
+					} else {
+						lines.push(line.trim());
+						line = words[i] + " ";
+						lineWordCount = 1;
+					}
+				}
+				lines.push(line.trim());
+				let straightLines = [];
+				let i = 0
+				while(lines.length > 0){
+					straightLines[i] = lines.pop();
+					i+=1;
+				}
+
+				var auxT = "";
+				while(straightLines.length > 0){
+					auxT += straightLines.pop() + "\n";
+				}
+
+				data.org_quote = data.quote;
+				data.quote = auxT;
+				return data;
+			}
+			
+			// Consigue una nueva quote
+			function newQuote(limit = null){
+				const o = findQuote();
+				const q = fixQuoteText(o, limit);
+				return q;
+			}
+			
+			// Convierte una quote en un texto completo.
+			function quotify(quote){
+				const q = quote.quote;
+				const a = quote.author;
+				const l = quote.life;
+				const p = quote.profession;
+
+				let output = `${q}\n- ${a} (${l}),\n ${p}`;
+				output = toNormalForm(output);
+				return output;
+			}
+
+			
+			// Esta función genera coordenadas para un círculo dado un origen (originA, originB), un radio y un tamaño de paso (stepSize).
+			function circleCoords(originA, originB, radius, stepSize = 0.1) {
+				// Se crea un arreglo llamado 'positions' para almacenar las coordenadas.
+				let positions = [];
+				// La variable 't' representa el ángulo en radianes que se está considerando en cada iteración.
+				let t = 0;
+				// La iteración continua mientras 't' sea menor a 2 * PI.
+				while (t < 2 * Math.PI) {
+					// Se calculan las coordenadas x y y usando las fórmulas matemáticas para círculos y se agrega al arreglo 'positions'.
+					positions.push([radius * Math.cos(t) + originA, radius * Math.sin(t) + originB]);
+					// Se aumenta el ángulo 't' en el tamaño de paso (stepSize).
+					t += stepSize;
+				}
+				// Se devuelve el arreglo 'positions' que contiene las coordenadas para el círculo.
+				return positions;
+			}
+
+			let sphere_org_y = sphere.position.y;
+			let sphere_org_z = sphere.position.z;
+			// Se toman las primeras coordenadas del círculo imaginario por el que pasará el círculo
+			circVals = circleCoords(sphere_org_y, sphere_org_z, text.split("\n").length*25, 0.025);
+			circPos = 0;
+
+			// Se encarga de conseguir la altura del texto mostrado en pantalla.
+			function getTextHeight(){
+				let x = text.split("\n").length-8;
+				return x * height;
+			}
+			// Se encarga de conseguir la longitud del texto mostrado en pantalla.
+			function getTextLengthSize(){
+				return text.split("\n")[0].length * 1.75;
+			}
+
+			// Se encarga de calcular la posición base de Y para la esfera.
+			function getSphereOffsetY(){
+				return textMesh1 ? 0 + getTextHeight() : 0;
+			}
+
+			// La función calculateSpherePosition() se encarga de calcular la posición de la esfera en la aplicación. 
+			function calculateSpherePosition(){
+				// Se verifica si existen los objetos textMesh1 y sphere antes de continuar. 
+				if(!textMesh1 || !sphere) return;
+				
+				// La esfera se vuelve hija de textMesh1 para que se ajuste a su posición. 
+				sphere.parent = textMesh1;
+				
+				// Se calcula la distancia de textMesh1. 
+				let dist = getTextLengthSize();
+				
+				// Se establece un límite para la posición x de la esfera. 
+				let limit_x = dist*10;
+				// Límite positivo
+				let plimit_x = limit_x;
+				// Límite negativo
+				let nlimit_x = 0;
+				
+				// Se establece un incremento para la posición x de la esfera. 
+				let x_inc = 1;
+				let posX = sphere.position.x;
+				
+				// Se determina la dirección de la esfera dependiendo de su posición actual. 
+				sph_dir = posX >= plimit_x ? -1 :
+				(posX <= nlimit_x) ? 1 : sph_dir;
+				
+				// Se actualiza la posición x de la esfera dependiendo de su dirección. 
+				sphere.position.x += (posX < plimit_x && sph_dir == 1) ? x_inc:
+				(posX > nlimit_x && sph_dir == -1) ? -x_inc : 0;
+				
+				// Se actualiza la posición y y z de la esfera de acuerdo a las coordenadas circulares previamente obtenidas. 
+				sphere.position.y = circVals[circPos][0] + getSphereOffsetY();
+				sphere.position.z = circVals[circPos][1];
+				
+				// Se actualiza la posición en el arreglo circVals. 
+				circPos = circPos >= circVals.length-1 ? 0 : circPos+1;
+			}
+			
+			function init() {
+
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				// CAMERA
+
+				camera = new THREE.PerspectiveCamera( 30, window.innerWidth / window.innerHeight, 1, 1500 );
+				camera.position.set( 0, 400, 1200 );
+
+				cameraTarget = new THREE.Vector3( 0, 150, 0 );
+
+				// SCENE
+
+				scene = new THREE.Scene();
+				scene.background = new THREE.Color( 0x003b5c );
+				// scene.fog = new THREE.Fog( 0x000000, 250, 1400 );
+
+				// LIGHTS
+
+				const dirLight = new THREE.DirectionalLight( 0xffffff, 0.125 );
+				dirLight.position.set( 0, 0, 1 ).normalize();
+				scene.add( dirLight );
+
+				const pointLight = new THREE.PointLight( 0xffffff, 1.5 );
+				let hsl = getValidColor();
+				pointLight.color.setHSL(hsl[0], hsl[1], hsl[2]);
+				pointLight.position.set( 0, 100, 90 );
+				scene.add( pointLight );
+
+				materials = [
+					new THREE.MeshPhongMaterial( { color: 0xffffff, flatShading: true } ), // front
+					new THREE.MeshPhongMaterial( { color: 0xffffff } ) // side
+				];
+
+				group = new THREE.Group();
+				group.position.y = 100;
+
+				scene.add( group );
+
+				loadFont();
+
+				// const plane = new THREE.Mesh(
+				// 	new THREE.PlaneGeometry( 10000, 10000 ),
+				// 	new THREE.MeshBasicMaterial( { color: 0xffffff, opacity: 0.5, transparent: true } )
+				// );
+				// plane.position.y = 100;
+				// plane.rotation.x = - Math.PI / 2;
+				// scene.add( plane );
+
+				// RENDERER
+
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				container.appendChild( renderer.domElement );
+
+				// EVENTS
+
+				container.style.touchAction = 'none';
+				container.addEventListener( 'pointerdown', onPointerDown );
+
+				document.addEventListener( 'keypress', onDocumentKeyPress );
+				document.addEventListener( 'keydown', onDocumentKeyDown );
+
+				//
+
+				const params = {
+					changeColor: function () {
+						let hsl = getValidColor();
+						pointLight.color.setHSL(hsl[0], hsl[1], hsl[2]);
+					},
+					changeFont: function () {
+
+						fontIndex ++;
+
+						fontName = reverseFontMap[ fontIndex % reverseFontMap.length ];
+
+						loadFont();
+
+					},
+					changeWeight: function () {
+
+						if ( fontWeight === 'bold' ) {
+
+							fontWeight = 'regular';
+
+						} else {
+
+							fontWeight = 'bold';
+
+						}
+
+						loadFont();
+
+					},
+					changeBevel: function () {
+
+						bevelEnabled = ! bevelEnabled;
+
+						refreshText();
+
+					},
+					receiveQuote: function () {
+						currentQuote = newQuote(6);
+						text = quotify(currentQuote);
+						console.log(text);
+						refreshText();
+						circVals = circleCoords(sphere_org_y, sphere_org_z, text.split("\n").length*25, 0.02);
+					},
+					listenQuote: function () {
+						textToSpeech(currentQuote.org_quote.replace("\n", " ") + "\n" + currentQuote.author);
+					},
+				};
+
+				//
+
+				const gui = new GUI();
+
+				gui.add( params, 'changeColor' ).name( 'Cambiar color 🎨' );
+				gui.add( params, 'changeFont' ).name( 'Cambiar fuente ⛲' );
+				gui.add( params, 'changeWeight' ).name( 'Cambiar peso ⚓' );
+				gui.add( params, 'changeBevel' ).name( 'Cambiar biselado 📐' );
+				// Se agregan los nuevos botones al GUI.
+				gui.add( params, 'receiveQuote' ).name( 'Nueva cita 📝' );
+				gui.add( params, 'listenQuote' ).name( 'Escuchar cita 🔊' );
+				gui.open();
+
+				window.addEventListener( 'resize', onWindowResize );
+
+			}
+
+			// Función para mantener la aplicación funcionando en caso de cambiar el tamaño de la ventana.
+			function onWindowResize() {
+
+				windowHalfX = window.innerWidth / 2;
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+
+			}
+
+			// Se supone que esto haría algo al presionar teclas pero no queremos esta función.
+			function onDocumentKeyDown( event ) {
+				return; // Para no hacer nada al escribir
+
+				if ( firstLetter ) {
+
+					firstLetter = false;
+					text = '';
+
+				}
+
+				const keyCode = event.keyCode;
+
+				// backspace
+
+				if ( keyCode == 8 ) {
+
+					event.preventDefault();
+
+					text = text.substring( 0, text.length - 1 );
+					refreshText();
+
+					return false;
+
+				}
+
+			}
+
+			// Se supone que esto haría algo al presionar teclas pero no queremos esta función.
+			function onDocumentKeyPress( event ) {
+				return; // Para no hacer nada al escribir
+				const keyCode = event.which;
+
+				// backspace
+
+				if ( keyCode == 8 ) {
+
+					event.preventDefault();
+
+				} else {
+
+					const ch = String.fromCharCode( keyCode );
+					text += ch;
+
+					refreshText();
+
+				}
+
+			}
+
+			function loadFont() {
+
+				const loader = new FontLoader();
+				loader.load( '/University_Projects/Graficación/fonts/' + fontName + '_' + fontWeight + '.typeface.json', function ( response ) {
+
+					font = response;
+
+					refreshText();
+
+				} );
+
+			}
+
+			// Función para crear texto
+			function createText() {
+
+				textGeo = new TextGeometry( text, {
+
+					font: font,
+
+					size: size,
+					height: height,
+					curveSegments: curveSegments,
+
+					bevelThickness: bevelThickness,
+					bevelSize: bevelSize,
+					bevelEnabled: bevelEnabled
+
+				} );
+
+				textGeo.computeBoundingBox();
+
+				const centerOffset = - 0.5 * ( textGeo.boundingBox.max.x - textGeo.boundingBox.min.x );
+
+				textMesh1 = new THREE.Mesh( textGeo, materials );
+
+				textMesh1.position.x = centerOffset;
+				textMesh1.position.y = hover;
+				textMesh1.position.z = 0;
+
+				textMesh1.rotation.x = 0;
+				textMesh1.rotation.y = Math.PI * 2;
+
+				group.add( textMesh1 );
+
+				if ( mirror ) {
+
+					textMesh2 = new THREE.Mesh( textGeo, materials );
+
+					textMesh2.position.x = centerOffset;
+					textMesh2.position.y = - hover;
+					textMesh2.position.z = height;
+
+					textMesh2.rotation.x = Math.PI;
+					textMesh2.rotation.y = Math.PI * 2;
+
+					group.add( textMesh2 );
+
+				}
+
+			}
+
+			// Función que actualiza el texto.
+			function refreshText() {
+
+				// Se elimina el texto que antes se tenía.
+				group.remove( textMesh1 );
+				if ( mirror ) group.remove( textMesh2 );
+
+				if ( ! text ) return;
+
+				// Se llama a la creación de nuevo texto.
+				createText();
+
+			}
+
+			function onPointerDown( event ) {
+
+				if ( event.isPrimary === false ) return;
+
+				pointerXOnPointerDown = event.clientX - windowHalfX;
+				targetRotationOnPointerDown = targetRotation;
+
+				document.addEventListener( 'pointermove', onPointerMove );
+				document.addEventListener( 'pointerup', onPointerUp );
+
+			}
+
+			function onPointerMove( event ) {
+
+				if ( event.isPrimary === false ) return;
+
+				pointerX = event.clientX - windowHalfX;
+
+				targetRotation = targetRotationOnPointerDown + ( pointerX - pointerXOnPointerDown ) * 0.02;
+
+			}
+
+			function onPointerUp() {
+
+				if ( event.isPrimary === false ) return;
+
+				document.removeEventListener( 'pointermove', onPointerMove );
+				document.removeEventListener( 'pointerup', onPointerUp );
+
+			}
+
+			function animate() {
+
+				requestAnimationFrame( animate );
+
+				render();
+
+			}
+
+			function render() {
+
+				group.rotation.y += ( targetRotation - group.rotation.y ) * 0.05;
+
+				camera.lookAt( cameraTarget );
+
+				// Se llama a la función para calcular y actualizar la posición de la esfera.
+				calculateSpherePosition();
+
+				renderer.clear();
+				renderer.render( scene, camera );
+
+			}
+			
+			scene.add(sphere);
+		</script>
+	</body>
+</html>
