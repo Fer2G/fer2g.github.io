@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+	<head>
+		<title>Audios y modelos :D</title>
+		<link rel="icon", href="https://images.vexels.com/media/users/3/175478/isolated/preview/d024a7d1f89320f2e290265408a38be4-pluma-tintero-tintero-papel-plano.png">
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+		<link type="text/css" rel="stylesheet" href="style.css">
+	</head>
+	<body>
+		<!-- Import maps polyfill -->
+		<!-- Remove this when import maps will be widely supported -->
+		<script async src="https://unpkg.com/es-module-shims@1.3.6/dist/es-module-shims.js"></script>
+
+		<script type="importmap">
+			{
+				"imports": {
+					"three": "/University_Projects/Graficación/Three.js-utils/build/three.module.js",
+					"three/addons/": "/University_Projects/Graficación/Three.js-utils/prime-jsm/"
+				}
+			}
+		</script>
+		<div id="info">
+			Fernando José Gil Uribe | 202037995
+			<br/>Modelos 3D y Audio
+		</div>
+
+		<script type="module">
+			function p(any){
+				console.log(any)
+			}
+
+			// Importar partes necesarias para el código
+			import * as THREE from 'three';
+			import { ParametricGeometry } from 'three/addons/geometries/ParametricGeometry.js';
+			import { ParametricGeometries } from 'three/addons/geometries/ParametricGeometries.js';
+			import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+			import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+			import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+			import { GUI } from 'three/addons/libs/lil-gui.module.min.js';
+
+			import { OBJLoader } from 'three/addons/loaders/OBJLoader.js';
+
+			// Variables necesarias por Three.js
+			THREE.Cache.enabled = true;
+			let container;
+			let camera, cameraTarget, scene, renderer;
+			let windowHalfX = window.innerWidth / 2;
+
+			let time,t,iter=0;
+
+			let animationRadius = 200;
+
+			let capybara;
+			let cat;
+			let skeleton;
+			let skull1;
+			let skull2;
+			let sofa;
+			let spaceship;
+			let stickman;
+			let varsize;
+
+			let audio_data,audio_listener,audio_loader,audio_analyser,sound,
+			songs = ["wii", "nggyu","shrek"], songIndex = 0;
+			let curve, curvePoints, curveInd=0, rotationDelay = 10, currentRot = 0;
+			
+			init();
+			animate();
+
+			function init() {
+				container = document.createElement( 'div' );
+				document.body.appendChild( container );
+
+				// Escena y render
+
+				scene = new THREE.Scene();
+				renderer = new THREE.WebGLRenderer( { antialias: true } );
+				renderer.setPixelRatio( window.devicePixelRatio );
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				container.appendChild( renderer.domElement );				
+				
+				// Cámara
+
+				camera = new THREE.PerspectiveCamera( 30, window.innerWidth / window.innerHeight, 1, 9000);
+
+				// Controles de cámara
+				let controls = new OrbitControls( camera, renderer.domElement );
+				controls.screenSpacePanning = true;
+				
+				// Función para dejar la cámara en su posición inicial
+				function defaultCamera(){
+					camera.position.set(0, 0, 2000);
+					cameraTarget = new THREE.Vector3( 0, 0, 0 );
+					camera.parent = null;
+					controls.minDistance = camera.near;
+					controls.maxDistance = camera.far;
+					controls.target.set( 0, 0, 0 );
+					controls.update();
+				}
+
+				defaultCamera();
+
+				// Función de utilería para actualizar la posición y objetivo de la cámara
+				function updateCamera(object){
+					if (!object){
+						defaultCamera();
+						return;
+					}
+					cameraTarget = object.position;
+					camera.parent = object;
+					camera.position.set(cameraTarget.x, 
+										cameraTarget.y, 
+										(object.geometry.parameters.radius ?
+										object.geometry.parameters.radius*8 : object.geometry.parameters.outer_radius));
+					// console.log(camera.position);
+				}
+				curve = new THREE.CatmullRomCurve3( [
+					new THREE.Vector3( 200, 0, 200 ),
+					new THREE.Vector3( -200, 50, 200 ),
+					new THREE.Vector3( -200, 0, -200 ),
+					new THREE.Vector3( 200, 50, -200 ),
+				],true);
+				curvePoints = curve.getPoints( 50 );
+				const geometry = new THREE.BufferGeometry().setFromPoints( curvePoints );
+				const material = new THREE.LineBasicMaterial( { color: 0xff0000 } );
+				const curveObject = new THREE.Line( geometry, material );
+				scene.add(curveObject)
+				
+				audio_listener = new THREE.AudioListener();
+				camera.add( audio_listener );
+				sound = new THREE.Audio( audio_listener );
+				audio_analyser = new THREE.AudioAnalyser( sound, 32 );
+
+				// load a sound and set it as the Audio object's buffer
+				audio_loader = new THREE.AudioLoader();
+				audio_loader.load( 'audio/'+songs[0]+'.mp3', function( buffer ) {
+					sound.setBuffer( buffer );
+					sound.setLoop(true);
+					sound.setVolume(0.5);
+				});
+
+				const dirLight = new THREE.DirectionalLight( 0xffffff, 0.125 );
+				dirLight.position.set( 0, 0, 1 ).normalize();
+				scene.add( dirLight );
+
+				const pointLight = new THREE.PointLight( 0xffffff, 1.5 );
+				pointLight.color.setHSL(10, 10, 10);
+				pointLight.position.set( 0, 100, 90 );
+				scene.add( pointLight );
+
+				// instantiate a loader
+				const model_loader = new OBJLoader();
+				// load a resource
+				model_loader.load(
+					'models/objs/capybara.obj',
+					function ( obj ) {
+						obj.position.set(0, 0, 0)
+						obj.rotation.x = Math.PI * 0.5;
+						obj.rotation.y = Math.PI * 1;
+						obj.rotation.z = Math.PI * 1;
+						obj.scale.multiplyScalar(4);
+						scene.add(obj)
+						capybara = obj;
+					},
+					function ( xhr ) {console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );},
+					function ( error ) {console.log("Model error:" + error);}
+				);
+				model_loader.load(
+					'models/objs/cat.obj',
+					function ( obj ) {
+						obj.position.set(0, 0, 0)
+						obj.rotation.x = Math.PI * 0.5;
+						obj.rotation.y = Math.PI * 1;
+						obj.rotation.z = Math.PI * 1;
+						scene.add(obj)
+						cat = obj;
+					},
+					function ( xhr ) {console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );},
+					function ( error ) {console.log("Model error:" + error);}
+				);
+				model_loader.load(
+					'models/objs/skeleton.obj',
+					function ( obj ) {
+						obj.position.set(-27, 8, 0)
+						scene.add(obj)
+						skeleton = obj;
+					},
+					function ( xhr ) {console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );},
+					function ( error ) {console.log("Model error:" + error);}
+				);
+				model_loader.load(
+					'models/objs/skull.obj',
+					function ( obj ) {
+						obj.position.set(0, 0, 0)
+						obj.scale.multiplyScalar(10);
+						scene.add(obj)
+						skull1 = obj;
+					},
+					function ( xhr ) {console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );},
+					function ( error ) {console.log("Model error:" + error);}
+				);
+				model_loader.load(
+					'models/objs/sofa.obj',
+					function ( obj ) {
+						obj.position.set(0, -25, -35)
+						obj.scale.multiplyScalar(50);
+						scene.add(obj)
+						sofa = obj;
+					},
+					function ( xhr ) {console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );},
+					function ( error ) {console.log("Model error:" + error);}
+				);
+				model_loader.load(
+					'models/objs/spaceship.obj',
+					function ( obj ) {
+						obj.position.set(400, 200, -400)
+						obj.scale.multiplyScalar(90);
+						obj.rotation.y = -Math.PI * 0.2;
+						scene.add(obj)
+						spaceship = obj;
+					},
+					function ( xhr ) {console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );},
+					function ( error ) {console.log("Model error:" + error);}
+				);
+				model_loader.load(
+					'models/objs/stickman.obj',
+					function ( obj ) {
+						obj.position.set(5, 0, 0)
+						scene.add(obj)
+						stickman = obj;
+					},
+					function ( xhr ) {console.log( ( xhr.loaded / xhr.total * 100 ) + '% loaded' );},
+					function ( error ) {console.log("Model error:" + error);}
+				);
+
+				// Funciones para el GUI que muestran a cada planeta.
+				const params = {
+					Default: function () {
+						updateCamera(null);
+						console.log("Perspectiva reiniciada");
+					},
+					PlayPause: function () {
+						if(sound.isPlaying)	sound.pause();
+						else sound.play();
+					},
+					ChangeSong: function () {
+						songIndex = songIndex + 1 > songs.length-1 ? 0 : songIndex+1;
+						audio_loader.load('audio/'+songs[songIndex]+'.mp3', function( buffer ) {
+							sound.stop();
+							sound.setBuffer( buffer );
+							sound.setLoop(true);
+							sound.setVolume(0.5);
+							sound.play();
+						});
+					},
+					openReport: function () {
+						window.open("../report.pdf", '_blank');
+
+					},
+				};
+				const gui = new GUI();
+				gui.add( params, 'Default' ).name( 'Reiniciar Cámara' );
+				gui.add( params, 'PlayPause' ).name( 'Iniciar/Detener música' );
+				gui.add( params, 'ChangeSong' ).name( 'Cambiar canción' );
+				gui.add( params, 'openReport' ).name( 'PDF de reporte' );
+				gui.open();
+				// Fin de GUI
+
+
+				window.addEventListener( 'resize', onWindowResize );
+				
+			}
+
+			function onWindowResize() {
+				windowHalfX = window.innerWidth / 2;
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+			}
+
+			function animate() {
+				time = .00025* performance.now();
+				t = time % 1;
+				varsize = Math.abs(Math.cos(time*10/2) * 150)
+				if(cat){
+					cat.position.x = -Math.cos(time*10/2) * animationRadius;
+					cat.position.z = Math.sin(time*10/2) * animationRadius;
+					cat.rotation.y = Math.PI * (time*1.5);
+					cat.rotation.z = Math.PI * (time*2);
+					cat.rotation.x = Math.PI * (time*3);
+					cat.scale.multiplyScalar((Math.cos(time*10)>0 ? 1.01 : 0.99))
+				}
+				if(capybara){
+					capybara.position.y = -Math.cos(time*10/2+20) * animationRadius;
+					capybara.position.z = Math.sin(time*10/2+20) * animationRadius;
+					capybara.rotation.y = Math.PI * (time*1.5);
+					capybara.rotation.z = Math.PI * (time*2);
+					capybara.rotation.x = Math.PI * (time*3);
+					capybara.scale.multiplyScalar((-Math.cos(time*10)>0 ? 1.01 : 0.99))
+				}
+				if(skull1 && audio_analyser){
+					if(curveInd > curvePoints.length-1)  curveInd = 0
+					const pointOnCurve = curvePoints[curveInd];
+					skull1.position.x = pointOnCurve.x
+					skull1.position.z = pointOnCurve.z
+					const scale = audio_analyser.getAverageFrequency()/8
+					const setscale = audio_analyser.getAverageFrequency() ?
+						scale : 5;
+					skull1.scale.set(setscale,setscale,setscale)
+					skull1.position.y = pointOnCurve.y + audio_analyser.getAverageFrequency();
+					currentRot +=1
+					if(currentRot == rotationDelay) {
+						currentRot = 0
+						curveInd += 1
+					}
+					skull1.rotation.y = Math.PI * (time*1.5);
+
+				}
+				if(spaceship){
+					spaceship.position.y = (Math.cos(time*10)>0 ? 
+					spaceship.position.y + 0.1 : spaceship.position.y-0.1)
+					spaceship.rotation.x = -Math.PI * (Math.cos(time*10)*.01);
+				}
+				iter++
+				requestAnimationFrame( animate );
+				render();
+			}			
+
+			function render() {
+				camera.lookAt( cameraTarget );
+
+				renderer.clear();
+				renderer.render( scene, camera );
+
+			}
+		</script>
+	</body>
+</html>
